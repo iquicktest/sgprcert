@@ -1,49 +1,35 @@
 import requests
 import json
 import os
-mail_username = '<username>'
-mail_password = '<password>'
-mail_recv = "<mail@gmail.com>"
-info_nric = '<ep_num>'
-info_no_of_people = '1'
-info_phonenumber = '123123XX'
 
-payload2017 = {
-    "get3MthCalendarRequest": {
-        "authToken": "",
-        "bookingID": "",
-        "collVenue": "ICA",
-        "groupBookingIDs": "",
-        "groupID": "",
-        "identifier1": info_nric,
-        "identifier2": info_no_of_people,
-        "identifier3": info_phonenumber,
-        "month": "1",
-        "nav": "P",
-        "noOfPpl": "3",
-        "selVseiMode": "",
-        "svcType": "PRAP",
-        "year": "2017"
+mail_username = ''
+mail_password = ''
+mail_recv = ""
+info_nric = ''
+info_no_of_people = ''
+info_phonenumber = ''
+
+base_url = 'https://eappointment.ica.gov.sg/ibook/services'
+
+def get_payload(month):
+    return {
+        "get3MthCalendarRequest": {
+            "authToken": "",
+            "bookingID": "",
+            "collVenue": "ICA",
+            "groupBookingIDs": "",
+            "groupID": "",
+            "identifier1": info_nric,
+            "identifier2": info_no_of_people,
+            "identifier3": info_phonenumber,
+            "month": str(month),
+            "nav": "P",
+            "noOfPpl": "3",
+            "selVseiMode": "",
+            "svcType": "PRAP",
+            "year": "2017"
+        }
     }
-}
-payload2016 = {
-    "get3MthCalendarRequest": {
-        "authToken": "",
-        "bookingID": "",
-        "collVenue": "ICA",
-        "groupBookingIDs": "",
-        "groupID": "",
-        "identifier1": info_nric,
-        "identifier2": info_no_of_people,
-        "identifier3": info_phonenumber,
-        "month": "12",
-        "nav": "P",
-        "noOfPpl": "3",
-        "selVseiMode": "",
-        "svcType": "PRAP",
-        "year": "2016"
-    }
-}
 
 headers = {
     'Content-type': 'application/json',
@@ -75,8 +61,6 @@ def send_email(user, pwd, recipient, subject, body):
         print "failed to send mail"
 
 def getToken():
-    import json
-    import requests
     pay_load = {
         "checkSingPassEligibilityRequest": {
             "authToken": "",
@@ -89,24 +73,34 @@ def getToken():
     headers = {
         'Content-type': 'application/json',
     }
-    r = requests.post(url='https://eappointment.ica.gov.sg/ibook/services/mwsCheckSingPassEligibility', data=json.dumps(pay_load), headers=headers)
+    r = requests.post(
+            url='{0}/mwsCheckSingPassEligibility'.format(base_url), 
+            data=json.dumps(pay_load), 
+            headers=headers)
     res = r.json()
-    return json.loads(res['message'])['checkSingPassEligibilityResponse'][0]['authToken']
+    return json.loads(
+            res['message'])['checkSingPassEligibilityResponse'][0]['authToken']
 
 def getWarning(data, headers):
     r = None
-    response = requests.post(url='https://eappointment.ica.gov.sg/ibook/services/mwsGet3MthCalendar', data=data, headers=headers)
+    status = ['cal_PH','cal_AF','cal_NA']
+    response = requests.post(
+            url='{0}/mwsGet3MthCalendar'.format(base_url), 
+            data=data, headers=headers)
+    # if error, then retry and get new token
     if 'error' in response.text:
         print 'bad'
         headers['auth_token'] = getToken()
-        response = requests.post(url='https://eappointment.ica.gov.sg/ibook/services/mwsGet3MthCalendar', data=data, headers=headers)
-    r= json.loads(response.text)
+        response = requests.post(
+                url='{0}/mwsGet3MthCalendar'.format(base_url), 
+                data=data, headers=headers)
+    r = json.loads(response.text)
     print r
     allres = json.loads(r['message'])['get3MthCalendarResponse'][0]['calendar']
     for i in allres:
         print i['startDate']
         for j in  i['days']:
-            if not j['dayStatus']=='cal_PH' and not j['dayStatus'] =='cal_AF' and not j['dayStatus']=='cal_NA':
+            if j['dayStatus'] not in status:
                 print j['dayStatus']
                 return i['startDate']+" - "+j['day']
     return None
@@ -118,13 +112,23 @@ day = ""
 ####################################################
 while True:
     try:
-        print '##### for 2016 #####'
-        key2016 = getWarning(json.dumps(payload2016), headers)
-        if not key2016==None:
-            day=key2016
+        print '##### for 2017 for 4~6 #####'
+        payload = get_payload(6)
+        key2017 = getWarning(json.dumps(payload), headers)
+        if not key2017==None:
+            day=key2017
             break;
-        print '##### for 2017 #####'
-        key2017 = getWarning(json.dumps(payload2017), headers)
+
+        print '##### for 2017 for 7~9 #####'
+        payload = get_payload(9)
+        key2017 = getWarning(json.dumps(payload), headers)
+        if not key2017==None:
+            day=key2017
+            break;
+
+        print '##### for 2017 for 10 #####'
+        payload = get_payload(12)
+        key2017 = getWarning(json.dumps(payload), headers)
         if not key2017==None:
             day=key2017
             break;
